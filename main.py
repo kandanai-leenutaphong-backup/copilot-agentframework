@@ -1,81 +1,50 @@
 import asyncio
-import logging
-import os
 
-from azure.ai.projects.aio import AIProjectClient
-from azure.identity.aio import DefaultAzureCredential
-from azure.ai.projects.models import Agent, AgentThread, MessageRole
+from agent_framework import ChatAgent
+from agent_framework.openai import OpenAIChatClient
 
-async def main():
-    # Set up logging
-    logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger(__name__)
 
-    # Initialize the Azure AI Project Client
-    # Replace these with your actual Azure AI Project details
-    project_connection_string = os.getenv("AZURE_AI_PROJECT_CONNECTION_STRING", "your_connection_string")
-    
-    async with AIProjectClient.from_connection_string(
-        credential=DefaultAzureCredential(),
-        conn_str=project_connection_string
-    ) as project_client:
-        
-        # Create an agent with Azure OpenAI
-        agent = await project_client.agents.create_agent(
-            model="your_models_deployment_name",  # Replace with your model deployment name
-            name="ChatAgent",
-            instructions="You are a helpful assistant that can control lights.",
-            # Note: Tools/functions can be added here if you have a LightsPlugin equivalent
-            # tools=[...]
-        )
-        
-        logger.info(f"Created agent with ID: {agent.id}")
-        
-        # Create a conversation thread
-        thread = await project_client.agents.create_thread()
-        logger.info(f"Created thread with ID: {thread.id}")
-        
-        # Initiate a back-and-forth chat
-        while True:
-            # Collect user input
-            user_input = input("User > ")
-            
-            # Terminate the loop if the user says "exit"
-            if user_input == "exit":
-                break
-            
-            # Add user message to the thread
-            await project_client.agents.create_message(
-                thread_id=thread.id,
-                role=MessageRole.USER,
-                content=user_input
-            )
-            
-            # Run the agent on the thread
-            run = await project_client.agents.create_and_process_run(
-                thread_id=thread.id,
-                agent_id=agent.id
-            )
-            
-            logger.info(f"Run completed with status: {run.status}")
-            
-            # Retrieve the agent's response
-            messages = await project_client.agents.list_messages(thread_id=thread.id)
-            
-            # Get the latest assistant message
-            for message in messages:
-                if message.role == MessageRole.ASSISTANT:
-                    # Print the assistant's response
-                    for content_item in message.content:
-                        if hasattr(content_item, 'text'):
-                            print(f"Assistant > {content_item.text.value}")
-                    break
-        
-        # Clean up: delete the agent and thread
-        await project_client.agents.delete_agent(agent.id)
-        await project_client.agents.delete_thread(thread.id)
-        logger.info("Cleaned up agent and thread")
+async def main() -> None:
+    # Create OpenAI chat client (uses OPENAI_API_KEY environment variable)
+    client = OpenAIChatClient(model_id="gpt-4o")
 
-# Run the main function
-if __name__ == "__main__":
-    asyncio.run(main())
+    # Create math expert agent
+    math_agent = ChatAgent(
+        name="math_expert",
+        chat_client=client,
+        instructions="You are a math expert.",
+        description="A math expert assistant.",
+    )
+
+    # Create chemistry expert agent
+    chemistry_agent = ChatAgent(
+        name="chemistry_expert",
+        chat_client=client,
+        instructions="You are a chemistry expert.",
+        description="A chemistry expert assistant.",
+    )
+
+    # Create main assistant agent with expert agents as tools (hierarchical pattern)
+    # Agent Framework allows agents to be used directly as tools without wrapper
+    agent = ChatAgent(
+        name="assistant",
+        chat_client=client,
+        instructions="You are a general assistant. Use expert tools when needed.",
+        tools=[math_agent, chemistry_agent],
+    )
+
+    # Execute queries with streaming responses
+    print("=== Question 1: Math Query ===")
+    async for chunk in agent.run_stream("What is the integral of x^2?"):
+        if chunk.text:
+            print(chunk.text, end="", flush=True)
+    print("\n")
+
+    print("=== Question 2: Chemistry Query ===")
+    async for chunk in agent.run_stream("What is the molecular weight of water?"):
+        if chunk.text:
+            print(chunk.text, end="", flush=True)
+    print("\n")
+
+
+asyncio.run(main())
