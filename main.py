@@ -1,6 +1,5 @@
 import asyncio
 
-from agent_framework import ChatAgent
 from agent_framework.openai import OpenAIChatClient
 
 
@@ -9,28 +8,37 @@ async def main() -> None:
     client = OpenAIChatClient(model_id="gpt-4o")
 
     # Create math expert agent
-    math_agent = ChatAgent(
+    math_agent = client.create_agent(
         name="math_expert",
-        chat_client=client,
         instructions="You are a math expert.",
-        description="A math expert assistant.",
     )
 
     # Create chemistry expert agent
-    chemistry_agent = ChatAgent(
+    chemistry_agent = client.create_agent(
         name="chemistry_expert",
-        chat_client=client,
         instructions="You are a chemistry expert.",
+    )
+
+    # Convert agents to tools using as_tool() method (hierarchical pattern)
+    math_tool = math_agent.as_tool(
+        name="math_expert",
+        description="A math expert assistant.",
+        arg_name="question",
+        arg_description="The math question to ask",
+    )
+
+    chemistry_tool = chemistry_agent.as_tool(
+        name="chemistry_expert",
         description="A chemistry expert assistant.",
+        arg_name="question",
+        arg_description="The chemistry question to ask",
     )
 
     # Create main assistant agent with expert agents as tools (hierarchical pattern)
-    # Agent Framework allows agents to be used directly as tools without wrapper
-    agent = ChatAgent(
+    agent = client.create_agent(
         name="assistant",
-        chat_client=client,
         instructions="You are a general assistant. Use expert tools when needed.",
-        tools=[math_agent, chemistry_agent],
+        tools=[math_tool, chemistry_tool],
     )
 
     # Execute queries with streaming responses
