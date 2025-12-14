@@ -1,6 +1,5 @@
 import asyncio
 
-from agent_framework import ChatAgent
 from agent_framework.openai import OpenAIChatClient
 
 
@@ -19,12 +18,26 @@ async def main() -> None:
         instructions="You are a chemistry expert.",
     )
 
+    # Convert agents to tools using as_tool() method
+    math_tool = math_agent.as_tool(
+        name="math_expert_tool",
+        description="A math expert assistant.",
+        arg_name="query",
+        arg_description="The math question to answer",
+    )
+
+    chemistry_tool = chemistry_agent.as_tool(
+        name="chemistry_expert_tool",
+        description="A chemistry expert assistant.",
+        arg_name="query",
+        arg_description="The chemistry question to answer",
+    )
+
     # Create main agent with expert agents as tools
-    # Agent Framework natively supports agents as tools
     agent = client.create_agent(
         name="assistant",
         instructions="You are a general assistant. Use expert tools when needed.",
-        tools=[math_agent, chemistry_agent],
+        tools=[math_tool, chemistry_tool],
     )
 
     # Execute first query with streaming
