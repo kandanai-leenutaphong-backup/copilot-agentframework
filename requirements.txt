@@ -1,7 +1,3 @@
-# Azure AI Agent Framework - Core package (required)
-agent-framework-core>=0.1.0
-
-# OpenAI integration for Agent Framework
-# Note: Using OpenAI provider as per the original code
-# Alternative: agent-framework-azure-ai for Azure OpenAI
-agent-framework-core[openai]>=0.1.0
+# Microsoft Agent Framework - Core package (required)
+# Using --pre flag for prerelease versions
+agent-framework-core
